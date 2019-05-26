@@ -24,16 +24,9 @@ def get_test_input(input_dim, CUDA):
     
     if CUDA:
         img_ = img_.cuda()
-    
     return img_
 
 def prep_image(img, inp_dim):
-    """
-    Prepare image for inputting to the neural network. 
-    
-    Returns a Variable 
-    """
-
     orig_im = img
     dim = orig_im.shape[1], orig_im.shape[0]
     img = (letterbox_image(orig_im, (inp_dim, inp_dim)))
@@ -53,13 +46,10 @@ def write(x, img):
     cv2.rectangle(img, c1, c2,color, -1)
     cv2.putText(img, label, (c1[0], c1[1] + t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 1, [225,255,255], 1);
     return img
-
+def object_li(x):
+    cls = int (x[-1])
+    return cls
 def arg_parse():
-    """
-    Parse arguements to the detect module
-    
-    """
-    
     
     parser = argparse.ArgumentParser(description='YOLO v3 Video Detection Module')
    
@@ -86,10 +76,12 @@ if __name__ == '__main__':
     confidence = float(args.confidence)
     nms_thesh = float(args.nms_thresh)
     start = 0
+    ch_num = 0
+    temp = 0
 
     CUDA = torch.cuda.is_available()
 
-    num_classes = 80
+    num_classes = 1 #4/28 80->1
 
     CUDA = torch.cuda.is_available()
     
@@ -97,7 +89,14 @@ if __name__ == '__main__':
     
     print("Loading network.....")
     model = Darknet(args.cfgfile)
-    model.load_weights(args.weightsfile)
+    # 5/8 add new type weights
+    if args.weightsfile.endswith(".weights"):
+        # Load darknet weights
+        model.load_darknet_weights(args.weightsfile)
+    else:
+        # Load checkpoint weights
+        model.load_state_dict(torch.load(args.weightsfile))
+    #model.load_weights(args.weightsfile)
     print("Network successfully loaded")
 
     model.net_info["height"] = args.reso
@@ -107,6 +106,7 @@ if __name__ == '__main__':
 
     if CUDA:
         model.cuda()
+        print("gpu")
         
     model(get_test_input(inp_dim, CUDA), CUDA)
 
@@ -119,17 +119,21 @@ if __name__ == '__main__':
     assert cap.isOpened(), 'Cannot capture source'
     
     frames = 0
-    start = time.time()    
+    start = time.time()
+
+    fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+    fps = 24
+    savedPath = './save_img/savev.avi'
+    ret, frame = cap.read()
+    out = cv2.VideoWriter(savedPath, fourcc, fps, (frame.shape[1], frame.shape[0]) )    
     while cap.isOpened():
         
         ret, frame = cap.read()
-        if ret:
-            
+        if ret:            
 
             img, orig_im, dim = prep_image(frame, inp_dim)
             
             im_dim = torch.FloatTensor(dim).repeat(1,2)                        
-            
             
             if CUDA:
                 im_dim = im_dim.cuda()
@@ -137,19 +141,17 @@ if __name__ == '__main__':
             
             with torch.no_grad():   
                 output = model(Variable(img), CUDA)
+                
             output = write_results(output, confidence, num_classes, nms = True, nms_conf = nms_thesh)
-
+            
             if type(output) == int:
                 frames += 1
-                print("FPS of the video is {:5.2f}".format( frames / (time.time() - start)))
-                cv2.imshow("frame", orig_im)
+                print("FPS of the video is {:5.2f}int".format( frames / (time.time() - start)))
+                out.write(frame)
                 key = cv2.waitKey(1)
                 if key & 0xFF == ord('q'):
                     break
                 continue
-            
-            
-
             
             im_dim = im_dim.repeat(output.size(0), 1)
             scaling_factor = torch.min(inp_dim/im_dim,1)[0].view(-1,1)
@@ -162,14 +164,19 @@ if __name__ == '__main__':
             for i in range(output.shape[0]):
                 output[i, [1,3]] = torch.clamp(output[i, [1,3]], 0.0, im_dim[i,0])
                 output[i, [2,4]] = torch.clamp(output[i, [2,4]], 0.0, im_dim[i,1])
-            
-            classes = load_classes('data/coco.names')
+                
+            classes = load_classes('data/chicken.names') #4/28 coco.names->chicken.names
             colors = pkl.load(open("pallete", "rb"))
             
+            ch_li = list(map(lambda x: object_li(x),output))
+            ch_num = ch_li.count(0) #5/13 14->0
+            if temp < ch_num :
+                temp = ch_num    
+        
             list(map(lambda x: write(x, orig_im), output))
             
-            
-            cv2.imshow("frame", orig_im)
+            cv2.putText(orig_im, str(temp), (30,50), cv2.FONT_HERSHEY_PLAIN, 3, [255,255,255], 5)
+            out.write(frame)
             key = cv2.waitKey(1)
             if key & 0xFF == ord('q'):
                 break
@@ -179,8 +186,5 @@ if __name__ == '__main__':
             
         else:
             break
-    
-
-    
     
 
