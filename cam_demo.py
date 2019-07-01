@@ -57,17 +57,19 @@ def arg_parse():
     parser.add_argument("--reso", dest = 'reso', help = 
                         "Input resolution of the network. Increase to increase accuracy. Decrease to increase speed",
                         default = "160", type = str)
+    parser.add_argument("--weight", dest = 'weight', help = "model", default = "weights/yolov3_chicken_second.pth")
     return parser.parse_args()
 
 if __name__ == '__main__':
+    args = arg_parse()
     cfgfile = "cfg/yolov3-custom.cfg" #change cfg cfg/yolov3.cfg→cfg/yolov3-custom.cfg
-    weightsfile = "weights/yolov3_ckpt_24.pth" #change model
+    weightsfile = args.weight #change model
     num_classes = 1 #80->1
 
     temp = 0
     ch_num = 0
 
-    args = arg_parse()
+    #args = arg_parse()
     confidence = float(args.confidence)
     nms_thesh = float(args.nms_thresh)
     start = 0
@@ -150,7 +152,7 @@ if __name__ == '__main__':
             colors = pkl.load(open("pallete", "rb"))
             
             ch_li = list(map(lambda x: object_li(x),output))
-            ch_num = ch_li.count(14)
+            ch_num = ch_li.count(0)
             if temp < ch_num:
                 temp = ch_num
             list(map(lambda x: write(x, orig_im), output))
