@@ -12,6 +12,7 @@ import pandas as pd
 import random 
 import pickle as pkl
 import argparse
+import matplotlib.pyplot as plt
 
 
 def get_test_input(input_dim, CUDA):
@@ -39,7 +40,8 @@ def write(x, img):
     c2 = tuple(x[3:5].int())
     cls = int(x[-1])
     label = "{0}".format(classes[cls])
-    color = random.choice(colors)
+    #color = random.choice(colors)
+    color = (0, 255, 0) #yello
     cv2.rectangle(img, c1, c2,color, 1)
     t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 1 , 1)[0]
     c2 = c1[0] + t_size[0] + 3, c1[1] + t_size[1] + 4
@@ -119,6 +121,9 @@ if __name__ == '__main__':
     assert cap.isOpened(), 'Cannot capture source'
     
     frames = 0
+    ch_num_total = 0
+    x = [] 
+    y = [] #store chicken number of every frame
     start = time.time()
 
     fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
@@ -170,6 +175,12 @@ if __name__ == '__main__':
             
             ch_li = list(map(lambda x: object_li(x),output))
             ch_num = ch_li.count(0) #5/13 14->0
+            print(ch_num)
+            x.append(frames)
+            y.append(ch_num)
+            ch_num_total += ch_num
+            print("total:" + str(ch_num_total))
+
             if temp < ch_num :
                 temp = ch_num    
         
@@ -182,9 +193,25 @@ if __name__ == '__main__':
                 break
             frames += 1
             print("FPS of the video is {:5.2f}".format( frames / (time.time() - start)))
+            print("frames:" + str(frames))
 
             
         else:
             break
+    mean = ch_num_total / frames
+    print("mean:" + str(mean))
+    var = 0
+    for i in y:
+        tmp = i-mean
+        var += tmp * tmp
+    var /= len(y)
+    print("variance:" + str(var))
+    #draw picture
+    plt.figure()
+    plt.plot(x,y)
+    plt.xlabel("frames")
+    plt.ylabel("ch_number")
+    plt.savefig("Distribution.png")
+    print("save picture!")
     
 
